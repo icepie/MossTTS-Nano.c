@@ -1,13 +1,11 @@
 *.o
-*.dylib
-*.dll
-*.so
 *.exe
 model.bin
 nanotts
+libnanotts.dylib
+nanotts.dll
 _embed_*.s
 *.profraw
 *.profdata
 output_*.wav
 *.codes
-*.dylib
