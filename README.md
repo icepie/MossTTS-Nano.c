@@ -50,8 +50,10 @@ The repository includes [`.github/workflows/package.yml`](.github/workflows/pack
 - macOS arm64
 - Windows x86_64
 
-Before running the workflow, set repository variable `NANOTTS_MODEL_URL` to a downloadable `model.bin` URL.
-If you want integrity checking, also set `NANOTTS_MODEL_SHA256`.
+The workflow downloads `model.bin` from:
+`https://github.com/kdrkdrkdr/MossTTS-Nano.c/releases/download/model/model.bin`
+
+If you want integrity checking, set repository variable `NANOTTS_MODEL_SHA256`.
 
 Run the workflow manually from Actions, or push a tag like `v0.1.0`.
 Each job uploads `nanotts-<platform>-<arch>.zip`, and tag builds also attach those zip files to the GitHub Release.

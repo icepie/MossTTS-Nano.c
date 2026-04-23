@@ -31,7 +31,7 @@ jobs:
             arch: x86_64
 
     env:
-      MODEL_URL: ${{ vars.NANOTTS_MODEL_URL }}
+      MODEL_URL: https://github.com/kdrkdrkdr/MossTTS-Nano.c/releases/download/model/model.bin
       MODEL_SHA256: ${{ vars.NANOTTS_MODEL_SHA256 }}
 
     steps:
@@ -44,10 +44,6 @@ jobs:
           set -euo pipefail
           if [[ -f model.bin ]]; then
             exit 0
-          fi
-          if [[ -z "${MODEL_URL:-}" ]]; then
-            echo "::error::Set repository variable NANOTTS_MODEL_URL before running this workflow."
-            exit 1
           fi
           curl -L --fail --retry 3 --retry-delay 2 "${MODEL_URL}" -o model.bin
           if [[ -n "${MODEL_SHA256:-}" ]]; then
