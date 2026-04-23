@@ -78,11 +78,28 @@ jobs:
           update: true
           install: >-
             base-devel
+            git
             mingw-w64-x86_64-gcc
             mingw-w64-x86_64-openblas
-            mingw-w64-x86_64-sentencepiece
+            mingw-w64-x86_64-cmake
+            mingw-w64-x86_64-ninja
             mingw-w64-x86_64-pkgconf
             zip
+
+      - name: Build SentencePiece on Windows
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: |
+          set -euo pipefail
+          git clone --depth 1 --branch v0.2.1 https://github.com/google/sentencepiece.git /tmp/sentencepiece
+          cmake -S /tmp/sentencepiece -B /tmp/sentencepiece/build -G Ninja \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX=/mingw64 \
+            -DSPM_ENABLE_SHARED=ON \
+            -DSPM_ENABLE_TCMALLOC=OFF \
+            -DSPM_BUILD_TEST=OFF
+          cmake --build /tmp/sentencepiece/build
+          cmake --install /tmp/sentencepiece/build
 
       - name: Build and package on Linux/macOS
         if: matrix.platform != 'windows'

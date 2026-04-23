@@ -12,8 +12,9 @@ extern "C" {
 
 SPTokenizer *sp_load_mem(const void *data, size_t size) {
     auto *sp = new SPTokenizer();
+    std::string serialized(reinterpret_cast<const char*>(data), size);
     auto status = sp->processor.LoadFromSerializedProto(
-        std::string_view(reinterpret_cast<const char*>(data), size));
+        serialized);
     if (!status.ok()) {
         fprintf(stderr, "SentencePiece load from memory failed: %s\n", status.ToString().c_str());
         delete sp;

@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include <math.h>
 
+static int read_exact(FILE *f, void *dst, size_t size) {
+    return fread(dst, 1, size, f) == size;
+}
+
 int wav_read(const char *path, float **data, int *channels, int *samples, int *sample_rate) {
     FILE *f = fopen(path, "rb");
     if (!f) { fprintf(stderr, "Cannot open WAV: %s\n", path); return -1; }
@@ -13,9 +17,13 @@ int wav_read(const char *path, float **data, int *channels, int *samples, int *s
     /* Read RIFF header */
     char riff[4], wave[4];
     uint32_t file_size;
-    fread(riff, 1, 4, f);
-    fread(&file_size, 4, 1, f);
-    fread(wave, 1, 4, f);
+    if (!read_exact(f, riff, sizeof(riff)) ||
+        !read_exact(f, &file_size, sizeof(file_size)) ||
+        !read_exact(f, wave, sizeof(wave))) {
+        fprintf(stderr, "Truncated WAV header: %s\n", path);
+        fclose(f);
+        return -1;
+    }
     if (memcmp(riff, "RIFF", 4) || memcmp(wave, "WAVE", 4)) {
         fprintf(stderr, "Not a WAV file: %s\n", path); fclose(f); return -1;
     }
@@ -32,11 +40,19 @@ int wav_read(const char *path, float **data, int *channels, int *samples, int *s
         if (fread(&chunk_size, 4, 1, f) != 1) break;
 
         if (memcmp(chunk_id, "fmt ", 4) == 0) {
-            fread(&audio_fmt, 2, 1, f);
-            fread(&num_channels, 2, 1, f);
-            fread(&sr, 4, 1, f);
+            if (!read_exact(f, &audio_fmt, sizeof(audio_fmt)) ||
+                !read_exact(f, &num_channels, sizeof(num_channels)) ||
+                !read_exact(f, &sr, sizeof(sr))) {
+                fprintf(stderr, "Truncated WAV fmt chunk: %s\n", path);
+                fclose(f);
+                return -1;
+            }
             fseek(f, 6, SEEK_CUR); /* skip byte_rate, block_align */
-            fread(&bits_per_sample, 2, 1, f);
+            if (!read_exact(f, &bits_per_sample, sizeof(bits_per_sample))) {
+                fprintf(stderr, "Truncated WAV fmt chunk: %s\n", path);
+                fclose(f);
+                return -1;
+            }
             if (chunk_size > 16) fseek(f, chunk_size - 16, SEEK_CUR);
             found_fmt = 1;
         } else if (memcmp(chunk_id, "data", 4) == 0) {
@@ -61,7 +77,10 @@ int wav_read(const char *path, float **data, int *channels, int *samples, int *s
     if (audio_fmt == 1 && bits_per_sample == 16) {
         /* PCM 16-bit */
         int16_t *raw = (int16_t *)malloc(data_size);
-        fread(raw, 1, data_size, f);
+        if (!raw || !read_exact(f, raw, data_size)) {
+            fprintf(stderr, "Truncated WAV PCM data: %s\n", path);
+            free(raw); free(buf); fclose(f); return -1;
+        }
         /* Deinterleave: WAV is [L,R,L,R,...] -> (channels, samples) */
         for (int s = 0; s < total_samples; s++)
             for (int c = 0; c < num_channels; c++)
@@ -70,7 +89,10 @@ int wav_read(const char *path, float **data, int *channels, int *samples, int *s
     } else if (audio_fmt == 3 && bits_per_sample == 32) {
         /* Float 32-bit */
         float *raw = (float *)malloc(data_size);
-        fread(raw, 1, data_size, f);
+        if (!raw || !read_exact(f, raw, data_size)) {
+            fprintf(stderr, "Truncated WAV float data: %s\n", path);
+            free(raw); free(buf); fclose(f); return -1;
+        }
         for (int s = 0; s < total_samples; s++)
             for (int c = 0; c < num_channels; c++)
                 buf[c * total_samples + s] = raw[s * num_channels + c];
@@ -225,4 +247,3 @@ int audio_resample(const float *input, int num_channels, int in_samples,
     free(kernel);
     return out_total;
 }
-

@@ -72,15 +72,21 @@ EMBED_OBJ="${BUILD_DIR}/embed_weights.o"
 
 COMMON_CFLAGS=(-O2 -Wall -Wextra -std=c11 -DUSE_OPENBLAS -DEMBED_WEIGHTS -fPIC)
 COMMON_CXXFLAGS=(-O2 -Wall -Wextra -std=c++17 -DEMBED_WEIGHTS -fPIC)
-mapfile -t INCLUDES < <(split_flags pkg-config --cflags openblas sentencepiece)
-mapfile -t PKG_LIBS < <(split_flags pkg-config --libs openblas sentencepiece)
+mapfile -t OPENBLAS_CFLAGS < <(split_flags pkg-config --cflags openblas)
+mapfile -t OPENBLAS_LIBS < <(split_flags pkg-config --libs openblas)
+INCLUDES=(
+    "${OPENBLAS_CFLAGS[@]}"
+    "-I${MINGW_PREFIX}/include"
+)
 LDFLAGS=(
     -shared
     "-Wl,--out-implib,${BUILD_DIR}/libnanotts.dll.a"
     -static-libgcc
     -static-libstdc++
     -lm
-    "${PKG_LIBS[@]}"
+    "-L${MINGW_PREFIX}/lib"
+    "${OPENBLAS_LIBS[@]}"
+    -lsentencepiece
 )
 
 cat > "${EMBED_ASM}" <<'EOF'

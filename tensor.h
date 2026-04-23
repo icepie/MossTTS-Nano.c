@@ -6,7 +6,7 @@
 
 #define MAX_DIMS 4
 #define MAX_TENSORS 600
-#define MAX_NAME_LEN 128
+#define MAX_NAME_LEN 256
 
 typedef struct {
     float *data;         /* FP32 data (NULL if raw) */

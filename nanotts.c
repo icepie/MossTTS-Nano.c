@@ -16,6 +16,10 @@ static WeightStore g_ws;
 static PromptBuilder g_pb;
 static int g_loaded = 0;
 
+static int read_exact(FILE *f, void *dst, size_t size) {
+    return fread(dst, 1, size, f) == size;
+}
+
 /* ================================================================ */
 
 TTS_API int load_model(void) {
@@ -168,13 +172,20 @@ TTS_API int generate_wav(const char *codes_path, const char *text,
                          int *out_channels, int *out_sr, int stereo) {
     FILE *f = fopen(codes_path, "rb");
     if (!f) return -1;
-    uint32_t magic, nq, frames;
-    fread(&magic, 4, 1, f);
-    fread(&nq, 4, 1, f);
-    fread(&frames, 4, 1, f);
+    uint32_t magic = 0, nq = 0, frames = 0;
+    if (!read_exact(f, &magic, sizeof(magic)) ||
+        !read_exact(f, &nq, sizeof(nq)) ||
+        !read_exact(f, &frames, sizeof(frames))) {
+        fclose(f);
+        return -1;
+    }
     if (magic != 0x434F4445) { fclose(f); return -1; }
     int *codes = (int *)malloc((size_t)nq * frames * sizeof(int));
-    fread(codes, sizeof(int), (size_t)nq * frames, f);
+    if (!codes || fread(codes, sizeof(int), (size_t)nq * frames, f) != (size_t)nq * frames) {
+        free(codes);
+        fclose(f);
+        return -1;
+    }
     fclose(f);
 
     int *codes_t = (int *)malloc((size_t)frames * nq * sizeof(int));
