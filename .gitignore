@@ -3,6 +3,7 @@
 model.bin
 nanotts
 libnanotts.dylib
+libnanotts.so
 nanotts.dll
 _embed_*.s
 *.profraw

@@ -1,8 +1,22 @@
 """End-to-end TTS inference example using ctypes."""
 import ctypes
+import os
+import platform
 
 # ===== Setup =====
-lib = ctypes.CDLL("./libnanotts.dylib")  # Windows: "./moss_tts.dll"
+if platform.system() == "Linux":
+    lib_path = "./libnanotts.so"
+elif platform.system() == "Darwin":
+    lib_path = "./libnanotts.dylib"
+else:
+    lib_path = "./moss_tts.dll"
+
+ref_wav = os.environ.get(
+    "NANOTTS_REF_WAV",
+    "/data/Projects/asr_server/test/asr/test_wavs/en.wav",
+)
+
+lib = ctypes.CDLL(lib_path)
 
 lib.load_model.restype = ctypes.c_int
 lib.free_model.restype = None
@@ -42,7 +56,7 @@ channels = ctypes.c_int()
 sr = ctypes.c_int()
 
 lib.generate_wav_from_ref(
-    b"../asserts/audio/ljs.wav",          # 레퍼런스 음성
+    ref_wav.encode(),                     # 레퍼런스 음성
     "Hello, nice to meet you.".encode(),  # 합성할 텍스트
     ctypes.byref(wav), ctypes.byref(samples),
     ctypes.byref(channels), ctypes.byref(sr),
@@ -54,7 +68,7 @@ print(f"Direct: {samples.value} samples, {channels.value}ch, {sr.value}Hz")
 
 # ===== 방법 2: 스타일 캐시 사용 =====
 # 스타일 추출 (1번만)
-lib.style_extract(b"../asserts/audio/ljs.wav", b"ljs.codes")
+lib.style_extract(ref_wav.encode(), b"ljs.codes")
 
 # 캐시된 스타일로 여러 문장 합성
 texts = [
