@@ -1,0 +1,112 @@
+name: package
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: ${{ matrix.platform }}-${{ matrix.arch }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            platform: linux
+            arch: x86_64
+          - os: macos-13
+            platform: macos
+            arch: x86_64
+          - os: macos-14
+            platform: macos
+            arch: arm64
+          - os: windows-2022
+            platform: windows
+            arch: x86_64
+
+    env:
+      MODEL_URL: ${{ vars.NANOTTS_MODEL_URL }}
+      MODEL_SHA256: ${{ vars.NANOTTS_MODEL_SHA256 }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Fetch model.bin
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f model.bin ]]; then
+            exit 0
+          fi
+          if [[ -z "${MODEL_URL:-}" ]]; then
+            echo "::error::Set repository variable NANOTTS_MODEL_URL before running this workflow."
+            exit 1
+          fi
+          curl -L --fail --retry 3 --retry-delay 2 "${MODEL_URL}" -o model.bin
+          if [[ -n "${MODEL_SHA256:-}" ]]; then
+            if command -v sha256sum >/dev/null 2>&1; then
+              echo "${MODEL_SHA256}  model.bin" | sha256sum -c -
+            else
+              actual="$(shasum -a 256 model.bin | awk '{print $1}')"
+              [[ "${actual}" == "${MODEL_SHA256}" ]]
+            fi
+          fi
+
+      - name: Install Linux dependencies
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config zip libopenblas-dev libsentencepiece-dev sentencepiece
+
+      - name: Install macOS dependencies
+        if: matrix.platform == 'macos'
+        shell: bash
+        run: |
+          set -euo pipefail
+          brew install openblas sentencepiece
+
+      - name: Setup MSYS2
+        if: matrix.platform == 'windows'
+        uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            base-devel
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-openblas
+            mingw-w64-x86_64-sentencepiece
+            mingw-w64-x86_64-pkgconf
+            zip
+
+      - name: Build and package on Linux/macOS
+        if: matrix.platform != 'windows'
+        shell: bash
+        run: bash scripts/ci/build_unix.sh "${{ matrix.platform }}" "${{ matrix.arch }}"
+
+      - name: Build and package on Windows
+        if: matrix.platform == 'windows'
+        shell: msys2 {0}
+        run: bash scripts/ci/build_windows.sh "${{ matrix.arch }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nanotts-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/nanotts-${{ matrix.platform }}-${{ matrix.arch }}.zip
+
+      - name: Publish release assets
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/nanotts-${{ matrix.platform }}-${{ matrix.arch }}.zip
+          overwrite_files: true

@@ -41,6 +41,21 @@ See [example.py](example.py) for full usage.
 make   # → libnanotts.dylib
 ```
 
+## GitHub Actions Packaging
+
+The repository includes [`.github/workflows/package.yml`](.github/workflows/package.yml) to build release zips for:
+
+- Linux x86_64
+- macOS x86_64
+- macOS arm64
+- Windows x86_64
+
+Before running the workflow, set repository variable `NANOTTS_MODEL_URL` to a downloadable `model.bin` URL.
+If you want integrity checking, also set `NANOTTS_MODEL_SHA256`.
+
+Run the workflow manually from Actions, or push a tag like `v0.1.0`.
+Each job uploads `nanotts-<platform>-<arch>.zip`, and tag builds also attach those zip files to the GitHub Release.
+
 ## Optimizations Applied
 
 From 68s → 2.3s (30x speedup):
